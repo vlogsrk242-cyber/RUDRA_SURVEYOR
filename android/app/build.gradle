@@ -8,6 +8,11 @@ android {
     namespace "com.rudra.surveyor"
     compileSdk flutter.compileSdkVersion
 
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
     defaultConfig {
         applicationId "com.rudra.surveyor"
         minSdk flutter.minSdkVersion
@@ -15,8 +20,8 @@ android {
         versionCode flutter.versionCode
         versionName flutter.versionName
     }
-}
 
-flutter {
-    source "../.."
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
