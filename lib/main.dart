@@ -10,38 +10,34 @@ class App extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     title: 'RUDRA SURVEYOR',
     home: Scaffold(
-      appBar: AppBar(
-        title: const Text('RUDRA SURVEYOR'),
-        centerTitle: true,
-      ),
-      body: GridView.count(
-        padding: const EdgeInsets.all(16),
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+      appBar: AppBar(title: const Text('RUDRA SURVEYOR')),
+      body: Column(
         children: [
-          _b('જમીન માપણી', Icons.landscape),
-          _b('GPS માપણી', Icons.location_on),
-          _b('Unit Conversion', Icons.swap_horiz),
-          _b('Area Calculator', Icons.calculate),
+          const SizedBox(height: 20),
+          Image.asset('assets/rudra_logo.jpg', height: 180),
+          const Text('Professional Land Surveyor',
+              style: TextStyle(fontSize: 18)),
+          Expanded(
+            child: GridView.count(
+              padding: const EdgeInsets.all(16),
+              crossAxisCount: 2,
+              children: [
+                _b('જમીન માપણી', Icons.landscape),
+                _b('GPS માપણી', Icons.location_on),
+                _b('Unit Conversion', Icons.swap_horiz),
+                _b('Area Calculator', Icons.calculate),
+              ],
+            ),
+          ),
         ],
       ),
     ),
   );
 
   static Widget _b(String t, IconData i) => Card(
-    child: InkWell(
-      onTap: () {},
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(i, size: 45),
-            const SizedBox(height: 8),
-            Text(t, textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    ),
+    child: Center(child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [Icon(i, size: 40), Text(t)],
+    )),
   );
 }
