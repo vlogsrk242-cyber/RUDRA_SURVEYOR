@@ -1,11 +1,24 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
-  runApp(const RudraSurveyor());
+  runApp(const RudraSurveyorApp());
 }
 
-class RudraSurveyor extends StatelessWidget {
-  const RudraSurveyor({super.key});
+// ============================================================
+// APP
+// ============================================================
+
+class RudraSurveyorApp extends StatelessWidget {
+  const RudraSurveyorApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,475 +27,772 @@ class RudraSurveyor extends StatelessWidget {
       title: 'RUDRA SURVEYOR',
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1565C0),
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF5F7FB),
       ),
       home: const Dashboard(),
     );
   }
 }
 
-// =====================================================
+// ============================================================
+// STORAGE
+// ============================================================
+
+class HistoryStore {
+  static const String key = 'land_records';
+
+  static Future<List<Map<String, dynamic>>> getRecords() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(key) ?? [];
+
+    return list.map((e) {
+      return Map<String, dynamic>.from(jsonDecode(e));
+    }).toList();
+  }
+
+  static Future<void> addRecord(
+    Map<String, dynamic> record,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(key) ?? [];
+
+    list.add(jsonEncode(record));
+    await prefs.setStringList(key, list);
+  }
+
+  static Future<void> deleteRecord(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(key) ?? [];
+
+    if (index >= 0 && index < list.length) {
+      list.removeAt(index);
+      await prefs.setStringList(key, list);
+    }
+  }
+}
+
+// ============================================================
+// PDF SERVICE
+// ============================================================
+
+class PdfService {
+  static Future<File> createPdf(
+    Map<String, dynamic> record,
+  ) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(30),
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+
+              pw.Center(
+                child: pw.Text(
+                  'RUDRA SURVEYOR',
+                  style: pw.TextStyle(
+                    fontSize: 26,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              pw.SizedBox(height: 5),
+
+              pw.Center(
+                child: pw.Text(
+                  'LAND SURVEY MEASUREMENT REPORT',
+                  style: pw.TextStyle(
+                    fontSize: 13,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              pw.SizedBox(height: 20),
+
+              pw.Divider(),
+
+              pw.SizedBox(height: 15),
+
+              _pdfRow(
+                'Owner Name',
+                record['owner'] ?? '-',
+              ),
+
+              _pdfRow(
+                'Mobile Number',
+                record['mobile'] ?? '-',
+              ),
+
+              _pdfRow(
+                'Village',
+                record['village'] ?? '-',
+              ),
+
+              _pdfRow(
+                'Taluka',
+                record['taluka'] ?? '-',
+              ),
+
+              _pdfRow(
+                'Survey Number',
+                record['survey'] ?? '-',
+              ),
+
+              _pdfRow(
+                'Survey Date',
+                record['date'] ?? '-',
+              ),
+
+              pw.SizedBox(height: 10),
+
+              pw.Divider(),
+
+              pw.SizedBox(height: 10),
+
+              _pdfRow(
+                'Length',
+                '${record['length'] ?? '0'} Meter',
+              ),
+
+              _pdfRow(
+                'Width',
+                '${record['width'] ?? '0'} Meter',
+              ),
+
+              _pdfRow(
+                'Total Area',
+                '${record['area'] ?? '0'} Square Meter',
+              ),
+
+              _pdfRow(
+                'Total Payment',
+                'Rs. ${record['payment'] ?? '0'}',
+              ),
+
+              pw.SizedBox(height: 30),
+
+              pw.Container(
+                padding: const pw.EdgeInsets.all(12),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(
+                    color: PdfColors.grey,
+                  ),
+                ),
+                child: pw.Text(
+                  'This report is generated by RUDRA SURVEYOR application.',
+                  style: const pw.TextStyle(
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+
+              pw.Spacer(),
+
+              pw.Center(
+                child: pw.Text(
+                  'RUDRA SURVEYOR',
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final directory =
+        await getApplicationDocumentsDirectory();
+
+    final fileName =
+        'RUDRA_SURVEY_${DateTime.now().millisecondsSinceEpoch}.pdf';
+
+    final file = File(
+      '${directory.path}/$fileName',
+    );
+
+    await file.writeAsBytes(
+      await pdf.save(),
+    );
+
+    return file;
+  }
+
+  static pw.Widget _pdfRow(
+    String title,
+    String value,
+  ) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 10),
+      child: pw.Row(
+        crossAxisAlignment:
+            pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(
+            width: 150,
+            child: pw.Text(
+              title,
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+          pw.Expanded(
+            child: pw.Text(value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Future<void> previewPdf(
+    Map<String, dynamic> record,
+  ) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(30),
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment:
+                pw.CrossAxisAlignment.start,
+            children: [
+
+              pw.Center(
+                child: pw.Text(
+                  'RUDRA SURVEYOR',
+                  style: pw.TextStyle(
+                    fontSize: 26,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              pw.SizedBox(height: 5),
+
+              pw.Center(
+                child: pw.Text(
+                  'LAND SURVEY MEASUREMENT REPORT',
+                  style: pw.TextStyle(
+                    fontSize: 13,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              pw.SizedBox(height: 20),
+
+              pw.Divider(),
+
+              pw.SizedBox(height: 15),
+
+              PdfService._pdfRow(
+                'Owner Name',
+                record['owner'] ?? '-',
+              ),
+
+              PdfService._pdfRow(
+                'Mobile Number',
+                record['mobile'] ?? '-',
+              ),
+
+              PdfService._pdfRow(
+                'Village',
+                record['village'] ?? '-',
+              ),
+
+              PdfService._pdfRow(
+                'Taluka',
+                record['taluka'] ?? '-',
+              ),
+
+              PdfService._pdfRow(
+                'Survey Number',
+                record['survey'] ?? '-',
+              ),
+
+              PdfService._pdfRow(
+                'Date',
+                record['date'] ?? '-',
+              ),
+
+              pw.SizedBox(height: 10),
+
+              pw.Divider(),
+
+              pw.SizedBox(height: 10),
+
+              PdfService._pdfRow(
+                'Length',
+                '${record['length'] ?? '0'} Meter',
+              ),
+
+              PdfService._pdfRow(
+                'Width',
+                '${record['width'] ?? '0'} Meter',
+              ),
+
+              PdfService._pdfRow(
+                'Total Area',
+                '${record['area'] ?? '0'} Square Meter',
+              ),
+
+              PdfService._pdfRow(
+                'Payment',
+                'Rs. ${record['payment'] ?? '0'}',
+              ),
+
+              pw.Spacer(),
+
+              pw.Center(
+                child: pw.Text(
+                  'Generated by RUDRA SURVEYOR',
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) async {
+        return pdf.save();
+      },
+    );
+  }
+
+  static Future<void> sharePdf(
+    Map<String, dynamic> record,
+  ) async {
+    final file = await createPdf(record);
+
+    await Share.shareXFiles(
+      [
+        XFile(
+          file.path,
+          mimeType: 'application/pdf',
+        ),
+      ],
+      subject: 'RUDRA SURVEYOR Land Survey Report',
+      text: 'Land Survey Report - RUDRA SURVEYOR',
+    );
+  }
+}
+
+// ============================================================
 // DASHBOARD
-// =====================================================
+// ============================================================
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
   @override
-  State<Dashboard> createState() => _DashboardState();
+  State<Dashboard> createState() =>
+      _DashboardState();
 }
 
 class _DashboardState extends State<Dashboard> {
-  int selectedIndex = 0;
+  int currentIndex = 0;
 
-  void openPage(Widget page) {
-    Navigator.push(
+  int totalRecords = 0;
+  double totalPayment = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    loadStats();
+  }
+
+  Future<void> loadStats() async {
+    final records =
+        await HistoryStore.getRecords();
+
+    double payment = 0;
+
+    for (final r in records) {
+      payment +=
+          double.tryParse(
+                r['payment']?.toString() ?? '0',
+              ) ??
+              0;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      totalRecords = records.length;
+      totalPayment = payment;
+    });
+  }
+
+  Future<void> openPage(Widget page) async {
+    await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => page),
+      MaterialPageRoute(
+        builder: (_) => page,
+      ),
     );
+
+    loadStats();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (currentIndex == 1) {
+      return HistoryPage(
+        onHome: () {
+          setState(() {
+            currentIndex = 0;
+          });
+        },
+      );
+    }
+
+    if (currentIndex == 2) {
+      return MapPage(
+        onHome: () {
+          setState(() {
+            currentIndex = 0;
+          });
+        },
+      );
+    }
+
+    if (currentIndex == 3) {
+      return ProfilePage(
+        onHome: () {
+          setState(() {
+            currentIndex = 0;
+          });
+        },
+      );
+    }
+
     return Scaffold(
-      backgroundColor: const Color(0xfff4f8fc),
-
-      // ================= APP BAR =================
-
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0,
         title: const Text(
           'RUDRA SURVEYOR',
           style: TextStyle(
-            fontSize: 21,
             fontWeight: FontWeight.bold,
-            color: Color(0xff103d72),
+            color: Color(0xFF123B68),
           ),
         ),
-        centerTitle: true,
         actions: [
           IconButton(
-            onPressed: () {
-              openPage(const SettingsPage());
-            },
             icon: const Icon(
               Icons.settings_outlined,
-              color: Color(0xff103d72),
             ),
+            onPressed: () {
+              openPage(
+                const SettingsPage(),
+              );
+            },
           ),
         ],
       ),
 
-      // ================= BODY =================
+      body: RefreshIndicator(
+        onRefresh: loadStats,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
 
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 15),
-          child: Column(
-            children: [
-
-              // ================= HEADER =================
-
-              Container(
-                width: double.infinity,
-                height: 255,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xff005ba9),
-                      Color(0xff1595d3),
-                      Color(0xff1a78bd),
-                    ],
-                  ),
+            // HEADER
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                borderRadius:
+                    BorderRadius.circular(24),
+                gradient:
+                    const LinearGradient(
+                  colors: [
+                    Color(0xFF1565C0),
+                    Color(0xFF42A5F5),
+                  ],
                 ),
-                child: Stack(
+              ),
+              child: Row(
+                children: [
+
+                  Container(
+                    width: 70,
+                    height: 70,
+                    padding:
+                        const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.circular(18),
+                    ),
+                    child: Image.asset(
+                      'assets/rudra_logo.jpg',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+
+                  const SizedBox(width: 15),
+
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'નમસ્તે! 👋',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 5),
+                        Text(
+                          'RUDRA SURVEYOR માં આપનું સ્વાગત છે.',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 22),
+
+            const Text(
+              'Survey Operations',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF173A5E),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OperationCard(
+              number: 'OP1',
+              title: 'જમીન માપણી નોંધ',
+              description:
+                  'માલિક, ગામ, તાલુકો, સર્વે નંબર, માપણી અને પેમેન્ટ નોંધો.',
+              icon: Icons.edit_document,
+              colors: const [
+                Color(0xFF1565C0),
+                Color(0xFF42A5F5),
+              ],
+              onTap: () {
+                openPage(
+                  const LandEntryPage(),
+                );
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            OperationCard(
+              number: 'OP2',
+              title: 'GPS Survey',
+              description:
+                  'GPS દ્વારા સ્થાન અને survey સંબંધિત માહિતી.',
+              icon: Icons.gps_fixed,
+              colors: const [
+                Color(0xFF00897B),
+                Color(0xFF26A69A),
+              ],
+              onTap: () {
+                openPage(
+                  const GpsPage(),
+                );
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            OperationCard(
+              number: 'OP3',
+              title: 'Unit Conversion',
+              description:
+                  'Meter, Feet, Inch અને Yard convert કરો.',
+              icon: Icons.swap_horiz,
+              colors: const [
+                Color(0xFF7B1FA2),
+                Color(0xFFAB47BC),
+              ],
+              onTap: () {
+                openPage(
+                  const UnitPage(),
+                );
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            OperationCard(
+              number: 'OP4',
+              title: 'Area Calculator',
+              description:
+                  'લંબાઈ અને પહોળાઈ પરથી area ગણો.',
+              icon: Icons.calculate,
+              colors: const [
+                Color(0xFFEF6C00),
+                Color(0xFFFFA726),
+              ],
+              onTap: () {
+                openPage(
+                  const AreaPage(),
+                );
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            const Text(
+              'Saved History',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF173A5E),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            InkWell(
+              borderRadius:
+                  BorderRadius.circular(22),
+              onTap: () {
+                setState(() {
+                  currentIndex = 1;
+                });
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius:
+                      BorderRadius.circular(22),
+                ),
+                child: Row(
                   children: [
 
-                    // Decorative circles
-                    Positioned(
-                      right: -40,
-                      top: -30,
-                      child: Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.08),
+                    Container(
+                      width: 55,
+                      height: 55,
+                      decoration: BoxDecoration(
+                        color:
+                            const Color(0xFFE3F2FD),
+                        borderRadius:
+                            BorderRadius.circular(
+                          16,
                         ),
+                      ),
+                      child: const Icon(
+                        Icons.history,
+                        color:
+                            Color(0xFF1565C0),
+                        size: 30,
                       ),
                     ),
 
-                    Positioned(
-                      left: -50,
-                      bottom: -60,
-                      child: Container(
-                        width: 170,
-                        height: 170,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.06),
-                        ),
-                      ),
-                    ),
+                    const SizedBox(width: 14),
 
-                    Padding(
-                      padding: const EdgeInsets.all(14),
+                    Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
                         children: [
-
-                          Row(
-                            children: [
-
-                              Container(
-                                width: 115,
-                                height: 115,
-                                padding: const EdgeInsets.all(5),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius:
-                                      BorderRadius.circular(18),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius:
-                                      BorderRadius.circular(14),
-                                  child: Image.asset(
-                                    'assets/rudra_logo.jpg',
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) {
-                                      return const Icon(
-                                        Icons.landscape,
-                                        size: 70,
-                                        color: Colors.blue,
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(width: 14),
-
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-
-                                    Text(
-                                      'RUDRA',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 34,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-
-                                    Text(
-                                      'SURVEYOR',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-
-                                    SizedBox(height: 5),
-
-                                    Text(
-                                      'DGPS • DRONE • TOTAL STATION',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const Spacer(),
-
-                          const Text(
-                            'નમસ્તે!',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
+                          Text(
+                            '$totalRecords Records',
+                            style:
+                                const TextStyle(
+                              fontSize: 17,
+                              fontWeight:
+                                  FontWeight.bold,
                             ),
                           ),
-
-                          const Text(
-                            'RUDRA SURVEYOR માં આપનું સ્વાગત છે.',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
+                          const SizedBox(height: 5),
+                          Text(
+                            'Total Payment: ₹${totalPayment.toStringAsFixed(0)}',
+                            style:
+                                const TextStyle(
+                              color: Colors.grey,
                             ),
                           ),
-
                         ],
                       ),
+                    ),
+
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 18,
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 12),
-
-              // ================= OP1 + OP2 =================
-
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-
-                  Expanded(
-                    child: OperationCard(
-                      op: 'OP1',
-                      title: 'જમીન માપણી નોંધ',
-                      description:
-                          'માલિકની માહિતી, ગામ, તાલુકો, મોબાઇલ, સર્વે નંબર, તારીખ, કુલ પેમેન્ટ અને PDF રિપોર્ટ.',
-                      icon: Icons.description_outlined,
-                      iconColor: const Color(0xff1476c9),
-                      backgroundColor: const Color(0xffe5f3ff),
-                      onTap: () {
-                        openPage(const LandEntryPage());
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    child: OperationCard(
-                      op: 'OP2',
-                      title: 'GPS માપણી',
-                      description:
-                          'GPS દ્વારા જમીનની Boundary માપો, Area અને Distance ગણો, Map પર જુઓ.',
-                      icon: Icons.location_on,
-                      iconColor: const Color(0xff16a34a),
-                      backgroundColor: const Color(0xffe8f8e9),
-                      onTap: () {
-                        openPage(const GpsPage());
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 10),
-
-              // ================= OP3 + OP4 =================
-
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-
-                  Expanded(
-                    child: OperationCard(
-                      op: 'OP3',
-                      title: 'Unit Conversion',
-                      description:
-                          'ચો.મી., ચો.ફૂટ, ગુંઠા, એકર, હેક્ટર વગેરેમાં રૂપાંતર.',
-                      icon: Icons.swap_horiz,
-                      iconColor: const Color(0xff6531b9),
-                      backgroundColor: const Color(0xfff0eaff),
-                      onTap: () {
-                        openPage(const UnitPage());
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    child: OperationCard(
-                      op: 'OP4',
-                      title: 'Area Calculator',
-                      description:
-                          'લંબચોરસ, ચોરસ, ત્રિકોણ અને અન્ય આકારોની જમીનનું ક્ષેત્રફળ ગણો.',
-                      icon: Icons.calculate,
-                      iconColor: const Color(0xffef6c00),
-                      backgroundColor: const Color(0xfffff1df),
-                      onTap: () {
-                        openPage(const AreaPage());
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // ================= SAVED HISTORY =================
-
-              GestureDetector(
-                onTap: () {
-                  openPage(const HistoryPage());
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: const Color(0xffe4f2ff),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x18000000),
-                        blurRadius: 6,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-
-                      Row(
-                        children: [
-
-                          const CircleAvatar(
-                            radius: 31,
-                            backgroundColor: Color(0xff1476c9),
-                            child: Icon(
-                              Icons.history,
-                              color: Colors.white,
-                              size: 37,
-                            ),
-                          ),
-
-                          const SizedBox(width: 12),
-
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-
-                                Text(
-                                  'Saved History',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xff123b70),
-                                  ),
-                                ),
-
-                                SizedBox(height: 3),
-
-                                Text(
-                                  'આગળની બધી નોંધો, માપણી અને પેમેન્ટ અહીંથી જુઓ.',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xff345776),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const Icon(
-                            Icons.arrow_forward_ios,
-                            color: Color(0xff1476c9),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      Row(
-                        children: [
-
-                          HistoryBox(
-                            icon: Icons.description,
-                            title: 'કુલ નોંધો',
-                            value: '12',
-                          ),
-
-                          const SizedBox(width: 7),
-
-                          HistoryBox(
-                            icon: Icons.location_on,
-                            title: 'કુલ માપણી',
-                            value: '8',
-                          ),
-
-                          const SizedBox(width: 7),
-
-                          HistoryBox(
-                            icon: Icons.currency_rupee,
-                            title: 'કુલ પેમેન્ટ',
-                            value: '₹1,85,000',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
 
-      // ================= BOTTOM NAVIGATION =================
-
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: Colors.white,
-        selectedIndex: selectedIndex,
-
-        onDestinationSelected: (index) {
-
+      bottomNavigationBar:
+          NavigationBar(
+        selectedIndex: currentIndex,
+        onDestinationSelected:
+            (index) {
           setState(() {
-            selectedIndex = index;
+            currentIndex = index;
           });
 
           if (index == 0) {
-            // Home
-          }
-
-          if (index == 1) {
-            openPage(const HistoryPage());
-          }
-
-          if (index == 2) {
-            openPage(const MapPage());
-          }
-
-          if (index == 3) {
-            openPage(const ProfilePage());
+            loadStats();
           }
         },
-
         destinations: const [
-
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+            icon:
+                Icon(Icons.home_outlined),
+            selectedIcon:
+                Icon(Icons.home),
             label: 'Home',
           ),
-
           NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
+            icon:
+                Icon(Icons.history_outlined),
+            selectedIcon:
+                Icon(Icons.history),
             label: 'History',
           ),
-
           NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map),
+            icon:
+                Icon(Icons.map_outlined),
+            selectedIcon:
+                Icon(Icons.map),
             label: 'Map',
           ),
-
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
+            icon:
+                Icon(Icons.person_outline),
+            selectedIcon:
+                Icon(Icons.person),
             label: 'Profile',
           ),
         ],
@@ -491,202 +801,108 @@ class _DashboardState extends State<Dashboard> {
   }
 }
 
-
-// =====================================================
+// ============================================================
 // OPERATION CARD
-// =====================================================
+// ============================================================
 
 class OperationCard extends StatelessWidget {
-  final String op;
+  final String number;
   final String title;
   final String description;
   final IconData icon;
-  final Color iconColor;
-  final Color backgroundColor;
+  final List<Color> colors;
   final VoidCallback onTap;
 
   const OperationCard({
     super.key,
-    required this.op,
+    required this.number,
     required this.title,
     required this.description,
     required this.icon,
-    required this.iconColor,
-    required this.backgroundColor,
+    required this.colors,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          height: 315,
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: Colors.white,
-              width: 2,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x18000000),
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-
-              // OP NUMBER
-
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: iconColor,
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: Text(
-                  op,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ICON
-
-              Center(
-                child: Container(
-                  width: 78,
-                  height: 78,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.75),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 52,
-                    color: iconColor,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // TITLE
-
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xff123b70),
-                ),
-              ),
-
-              const SizedBox(height: 7),
-
-              // DESCRIPTION
-
-              Expanded(
-                child: Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    height: 1.4,
-                    color: Color(0xff23486c),
-                  ),
-                ),
-              ),
-
-              // ARROW
-
-              Align(
-                alignment: Alignment.bottomRight,
-                child: CircleAvatar(
-                  radius: 21,
-                  backgroundColor: iconColor,
-                  child: const Icon(
-                    Icons.arrow_forward,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
-// =====================================================
-// HISTORY BOX
-// =====================================================
-
-class HistoryBox extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-
-  const HistoryBox({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
+    return InkWell(
+      borderRadius:
+          BorderRadius.circular(22),
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding:
+            const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          gradient:
+              LinearGradient(colors: colors),
+          borderRadius:
+              BorderRadius.circular(22),
         ),
-        child: Column(
+        child: Row(
           children: [
 
-            Icon(
-              icon,
-              color: const Color(0xff1476c9),
-              size: 24,
-            ),
-
-            const SizedBox(height: 3),
-
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Colors.grey,
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color:
+                    Colors.white.withOpacity(
+                  0.20,
+                ),
+                borderRadius:
+                    BorderRadius.circular(17),
+              ),
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: 30,
               ),
             ),
 
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xff123b70),
+            const SizedBox(width: 15),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    number,
+                    style:
+                        const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                  Text(
+                    title,
+                    style:
+                        const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style:
+                        const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Icon(
+                Icons.arrow_forward,
+                color:
+                    Color(0xFF1565C0),
               ),
             ),
           ],
@@ -696,238 +912,1326 @@ class HistoryBox extends StatelessWidget {
   }
 }
 
+// ============================================================
+// OP1
+// ============================================================
 
-// =====================================================
-// LAND ENTRY
-// =====================================================
-
-class LandEntryPage extends StatelessWidget {
+class LandEntryPage extends StatefulWidget {
   const LandEntryPage({super.key});
 
   @override
+  State<LandEntryPage> createState() =>
+      _LandEntryPageState();
+}
+
+class _LandEntryPageState
+    extends State<LandEntryPage> {
+
+  final formKey =
+      GlobalKey<FormState>();
+
+  final owner =
+      TextEditingController();
+
+  final mobile =
+      TextEditingController();
+
+  final village =
+      TextEditingController();
+
+  final taluka =
+      TextEditingController();
+
+  final survey =
+      TextEditingController();
+
+  final length =
+      TextEditingController();
+
+  final width =
+      TextEditingController();
+
+  final payment =
+      TextEditingController();
+
+  DateTime date = DateTime.now();
+
+  double area = 0;
+
+  @override
+  void dispose() {
+    owner.dispose();
+    mobile.dispose();
+    village.dispose();
+    taluka.dispose();
+    survey.dispose();
+    length.dispose();
+    width.dispose();
+    payment.dispose();
+    super.dispose();
+  }
+
+  void calculateArea() {
+    final l =
+        double.tryParse(length.text) ?? 0;
+
+    final w =
+        double.tryParse(width.text) ?? 0;
+
+    setState(() {
+      area = l * w;
+    });
+  }
+
+  Future<void> chooseDate() async {
+    final result =
+        await showDatePicker(
+      context: context,
+      initialDate: date,
+      firstDate:
+          DateTime(2000),
+      lastDate:
+          DateTime(2100),
+    );
+
+    if (result != null) {
+      setState(() {
+        date = result;
+      });
+    }
+  }
+
+  Future<void> save() async {
+    if (!formKey.currentState!
+        .validate()) {
+      return;
+    }
+
+    calculateArea();
+
+    final record = {
+      'owner': owner.text.trim(),
+      'mobile': mobile.text.trim(),
+      'village': village.text.trim(),
+      'taluka': taluka.text.trim(),
+      'survey': survey.text.trim(),
+      'length': length.text.trim(),
+      'width': width.text.trim(),
+      'area': area.toStringAsFixed(2),
+      'payment': payment.text.trim(),
+      'date':
+          '${date.day}/${date.month}/${date.year}',
+    };
+
+    await HistoryStore.addRecord(
+      record,
+    );
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text(
+            'Save Successful ✅',
+          ),
+          content: const Text(
+            'જમીન માપણીની નોંધ Save થઈ ગઈ છે.\n\nહવે PDF બનાવીને WhatsApp દ્વારા મોકલી શકો છો.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    await showReportOptions(
+      record,
+    );
+  }
+
+  Future<void> showReportOptions(
+    Map<String, dynamic> record,
+  ) async {
+    await showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding:
+                const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize:
+                  MainAxisSize.min,
+              children: [
+
+                const Text(
+                  'Land Survey Report',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                ListTile(
+                  leading: const Icon(
+                    Icons.picture_as_pdf,
+                    color: Colors.red,
+                  ),
+                  title:
+                      const Text('PDF બનાવો / Preview'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await PdfService
+                        .previewPdf(record);
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(
+                    Icons.share,
+                    color: Colors.green,
+                  ),
+                  title: const Text(
+                    'PDF WhatsApp / Share',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await PdfService
+                        .sharePdf(record);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const ToolPage(
-      title: 'જમીન માપણી નોંધ',
-      icon: Icons.description,
-      description:
-          'માલિકની માહિતી, ગામ, તાલુકો, મોબાઇલ, સર્વે નંબર, તારીખ, પેમેન્ટ અને PDF રિપોર્ટ.',
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('જમીન માપણી નોંધ'),
+        backgroundColor:
+            const Color(0xFF1565C0),
+        foregroundColor: Colors.white,
+      ),
+      body: Form(
+        key: formKey,
+        child: ListView(
+          padding:
+              const EdgeInsets.all(16),
+          children: [
+
+            const InfoBox(
+              text:
+                  'માહિતી Save કર્યા પછી Saved History માં રહેશે અને PDF Report બનાવી શકાશે.',
+            ),
+
+            const SizedBox(height: 16),
+
+            AppField(
+              controller: owner,
+              label: 'માલિકનું નામ',
+              icon: Icons.person,
+            ),
+
+            AppField(
+              controller: mobile,
+              label: 'મોબાઇલ નંબર',
+              icon: Icons.phone,
+              keyboard:
+                  TextInputType.phone,
+            ),
+
+            AppField(
+              controller: village,
+              label: 'ગામ',
+              icon: Icons.location_city,
+            ),
+
+            AppField(
+              controller: taluka,
+              label: 'તાલુકો',
+              icon: Icons.location_on,
+            ),
+
+            AppField(
+              controller: survey,
+              label: 'સર્વે નંબર',
+              icon: Icons.numbers,
+            ),
+
+            const SizedBox(height: 5),
+
+            InkWell(
+              onTap: chooseDate,
+              child: InputDecorator(
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'માપણીની તારીખ',
+                  prefixIcon: Icon(
+                    Icons.calendar_month,
+                  ),
+                  border:
+                      OutlineInputBorder(),
+                ),
+                child: Text(
+                  '${date.day}/${date.month}/${date.year}',
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            Row(
+              children: [
+
+                Expanded(
+                  child: AppField(
+                    controller: length,
+                    label: 'લંબાઈ (મીટર)',
+                    icon:
+                        Icons.straighten,
+                    keyboard:
+                        const TextInputType
+                            .numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) =>
+                        calculateArea(),
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: AppField(
+                    controller: width,
+                    label: 'પહોળાઈ (મીટર)',
+                    icon:
+                        Icons.straighten,
+                    keyboard:
+                        const TextInputType
+                            .numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) =>
+                        calculateArea(),
+                  ),
+                ),
+              ],
+            ),
+
+            Container(
+              padding:
+                  const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color:
+                    const Color(0xFFE3F2FD),
+                borderRadius:
+                    BorderRadius.circular(16),
+              ),
+              child: Text(
+                'Total Area: ${area.toStringAsFixed(2)} m²',
+                style:
+                    const TextStyle(
+                  fontSize: 17,
+                  fontWeight:
+                      FontWeight.bold,
+                  color:
+                      Color(0xFF1565C0),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            AppField(
+              controller: payment,
+              label: 'કુલ પેમેન્ટ (₹)',
+              icon:
+                  Icons.currency_rupee,
+              keyboard:
+                  const TextInputType
+                      .numberWithOptions(
+                decimal: true,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            SizedBox(
+              height: 55,
+              child: ElevatedButton.icon(
+                onPressed: save,
+                icon: const Icon(
+                  Icons.save,
+                ),
+                label: const Text(
+                  'Save + PDF Report',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+                style:
+                    ElevatedButton.styleFrom(
+                  backgroundColor:
+                      const Color(
+                    0xFF1565C0,
+                  ),
+                  foregroundColor:
+                      Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
+// ============================================================
+// HISTORY
+// ============================================================
 
-// =====================================================
+class HistoryPage extends StatefulWidget {
+  final VoidCallback onHome;
+
+  const HistoryPage({
+    super.key,
+    required this.onHome,
+  });
+
+  @override
+  State<HistoryPage> createState() =>
+      _HistoryPageState();
+}
+
+class _HistoryPageState
+    extends State<HistoryPage> {
+
+  List<Map<String, dynamic>> records = [];
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    final data =
+        await HistoryStore.getRecords();
+
+    if (!mounted) return;
+
+    setState(() {
+      records = data.reversed.toList();
+    });
+  }
+
+  Future<void> delete(
+    int displayIndex,
+  ) async {
+    final originalIndex =
+        records.length -
+            1 -
+            displayIndex;
+
+    await HistoryStore.deleteRecord(
+      originalIndex,
+    );
+
+    load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('Saved History'),
+        backgroundColor:
+            const Color(0xFF1565C0),
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon:
+              const Icon(Icons.arrow_back),
+          onPressed: widget.onHome,
+        ),
+      ),
+      body: records.isEmpty
+          ? const Center(
+              child: Text(
+                'હજુ કોઈ જમીન માપણી નોંધ નથી.',
+                style: TextStyle(
+                  fontSize: 18,
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: load,
+              child: ListView.builder(
+                padding:
+                    const EdgeInsets.all(15),
+                itemCount:
+                    records.length,
+                itemBuilder:
+                    (context, index) {
+                  final r =
+                      records[index];
+
+                  return Card(
+                    margin:
+                        const EdgeInsets.only(
+                      bottom: 12,
+                    ),
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.all(
+                        15,
+                      ),
+                      child: Column(
+                        children: [
+
+                          Row(
+                            children: [
+
+                              const CircleAvatar(
+                                backgroundColor:
+                                    Color(
+                                  0xFFE3F2FD,
+                                ),
+                                child: Icon(
+                                  Icons.landscape,
+                                  color:
+                                      Color(
+                                    0xFF1565C0,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(
+                                width: 12,
+                              ),
+
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    Text(
+                                      r['owner']
+                                              ?.toString() ??
+                                          '-',
+                                      style:
+                                          const TextStyle(
+                                        fontSize:
+                                            17,
+                                        fontWeight:
+                                            FontWeight
+                                                .bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Survey No: ${r['survey'] ?? '-'}',
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              IconButton(
+                                icon:
+                                    const Icon(
+                                  Icons
+                                      .delete_outline,
+                                  color:
+                                      Colors.red,
+                                ),
+                                onPressed: () =>
+                                    delete(index),
+                              ),
+                            ],
+                          ),
+
+                          const Divider(),
+
+                          _historyRow(
+                            'Location',
+                            '${r['village'] ?? '-'}, ${r['taluka'] ?? '-'}',
+                          ),
+
+                          _historyRow(
+                            'Area',
+                            '${r['area'] ?? '0'} m²',
+                          ),
+
+                          _historyRow(
+                            'Payment',
+                            '₹${r['payment'] ?? '0'}',
+                          ),
+
+                          _historyRow(
+                            'Date',
+                            '${r['date'] ?? '-'}',
+                          ),
+
+                          const SizedBox(
+                            height: 8,
+                          ),
+
+                          Row(
+                            children: [
+
+                              Expanded(
+                                child:
+                                    OutlinedButton.icon(
+                                  onPressed:
+                                      () {
+                                    PdfService
+                                        .previewPdf(
+                                      r,
+                                    );
+                                  },
+                                  icon:
+                                      const Icon(
+                                    Icons
+                                        .picture_as_pdf,
+                                  ),
+                                  label:
+                                      const Text(
+                                    'PDF',
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(
+                                width: 10,
+                              ),
+
+                              Expanded(
+                                child:
+                                    ElevatedButton.icon(
+                                  onPressed:
+                                      () {
+                                    PdfService
+                                        .sharePdf(
+                                      r,
+                                    );
+                                  },
+                                  icon:
+                                      const Icon(
+                                    Icons.share,
+                                  ),
+                                  label:
+                                      const Text(
+                                    'Share',
+                                  ),
+                                  style:
+                                      ElevatedButton
+                                          .styleFrom(
+                                    backgroundColor:
+                                        Colors
+                                            .green,
+                                    foregroundColor:
+                                        Colors
+                                            .white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+    );
+  }
+
+  Widget _historyRow(
+    String title,
+    String value,
+  ) {
+    return Padding(
+      padding:
+          const EdgeInsets.only(
+        bottom: 7,
+      ),
+      child: Row(
+        children: [
+          Text(
+            '$title: ',
+            style:
+                const TextStyle(
+              fontWeight:
+                  FontWeight.bold,
+            ),
+          ),
+          Expanded(
+            child: Text(value),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// AREA CALCULATOR
+// ============================================================
+
+class AreaPage extends StatefulWidget {
+  const AreaPage({super.key});
+
+  @override
+  State<AreaPage> createState() =>
+      _AreaPageState();
+}
+
+class _AreaPageState
+    extends State<AreaPage> {
+
+  final length =
+      TextEditingController();
+
+  final width =
+      TextEditingController();
+
+  double area = 0;
+
+  void calculate() {
+    final l =
+        double.tryParse(length.text) ?? 0;
+
+    final w =
+        double.tryParse(width.text) ?? 0;
+
+    setState(() {
+      area = l * w;
+    });
+  }
+
+  @override
+  void dispose() {
+    length.dispose();
+    width.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('Area Calculator'),
+        backgroundColor:
+            const Color(0xFFEF6C00),
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding:
+            const EdgeInsets.all(16),
+        children: [
+
+          AppField(
+            controller: length,
+            label: 'લંબાઈ (મીટર)',
+            icon: Icons.straighten,
+            keyboard:
+                const TextInputType
+                    .numberWithOptions(
+              decimal: true,
+            ),
+          ),
+
+          AppField(
+            controller: width,
+            label: 'પહોળાઈ (મીટર)',
+            icon: Icons.straighten,
+            keyboard:
+                const TextInputType
+                    .numberWithOptions(
+              decimal: true,
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          ElevatedButton(
+            onPressed: calculate,
+            style:
+                ElevatedButton.styleFrom(
+              backgroundColor:
+                  const Color(0xFFEF6C00),
+              foregroundColor:
+                  Colors.white,
+            ),
+            child: const Text(
+              'Calculate Area',
+            ),
+          ),
+
+          const SizedBox(height: 25),
+
+          Center(
+            child: Text(
+              '${area.toStringAsFixed(2)} m²',
+              style: const TextStyle(
+                fontSize: 32,
+                fontWeight:
+                    FontWeight.bold,
+                color:
+                    Color(0xFFEF6C00),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// UNIT
+// ============================================================
+
+class UnitPage extends StatefulWidget {
+  const UnitPage({super.key});
+
+  @override
+  State<UnitPage> createState() =>
+      _UnitPageState();
+}
+
+class _UnitPageState
+    extends State<UnitPage> {
+
+  final input =
+      TextEditingController();
+
+  String from = 'Meter';
+  String to = 'Feet';
+  String result = '0';
+
+  final units = [
+    'Meter',
+    'Feet',
+    'Inch',
+    'Yard',
+  ];
+
+  double meterValue(
+    double value,
+    String unit,
+  ) {
+    if (unit == 'Feet') {
+      return value * 0.3048;
+    }
+
+    if (unit == 'Inch') {
+      return value * 0.0254;
+    }
+
+    if (unit == 'Yard') {
+      return value * 0.9144;
+    }
+
+    return value;
+  }
+
+  double convertFromMeter(
+    double value,
+    String unit,
+  ) {
+    if (unit == 'Feet') {
+      return value / 0.3048;
+    }
+
+    if (unit == 'Inch') {
+      return value / 0.0254;
+    }
+
+    if (unit == 'Yard') {
+      return value / 0.9144;
+    }
+
+    return value;
+  }
+
+  void convert() {
+    final value =
+        double.tryParse(input.text) ?? 0;
+
+    final meters =
+        meterValue(value, from);
+
+    final converted =
+        convertFromMeter(
+      meters,
+      to,
+    );
+
+    setState(() {
+      result =
+          converted.toStringAsFixed(4);
+    });
+  }
+
+  @override
+  void dispose() {
+    input.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('Unit Conversion'),
+        backgroundColor:
+            const Color(0xFF7B1FA2),
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding:
+            const EdgeInsets.all(16),
+        children: [
+
+          AppField(
+            controller: input,
+            label: 'Value',
+            icon: Icons.numbers,
+            keyboard:
+                const TextInputType
+                    .numberWithOptions(
+              decimal: true,
+            ),
+          ),
+
+          DropdownButtonFormField<String>(
+            initialValue: from,
+            decoration:
+                const InputDecoration(
+              labelText: 'From',
+              border:
+                  OutlineInputBorder(),
+            ),
+            items: units
+                .map(
+                  (u) => DropdownMenuItem(
+                    value: u,
+                    child: Text(u),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) {
+              if (v != null) {
+                setState(() {
+                  from = v;
+                });
+              }
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          DropdownButtonFormField<String>(
+            initialValue: to,
+            decoration:
+                const InputDecoration(
+              labelText: 'To',
+              border:
+                  OutlineInputBorder(),
+            ),
+            items: units
+                .map(
+                  (u) => DropdownMenuItem(
+                    value: u,
+                    child: Text(u),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) {
+              if (v != null) {
+                setState(() {
+                  to = v;
+                });
+              }
+            },
+          ),
+
+          const SizedBox(height: 15),
+
+          ElevatedButton(
+            onPressed: convert,
+            child:
+                const Text('Convert'),
+          ),
+
+          const SizedBox(height: 20),
+
+          Center(
+            child: Text(
+              '$result $to',
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight:
+                    FontWeight.bold,
+                color:
+                    Color(0xFF7B1FA2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
 // GPS
-// =====================================================
+// ============================================================
 
 class GpsPage extends StatelessWidget {
   const GpsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const ToolPage(
-      title: 'GPS માપણી',
-      icon: Icons.location_on,
-      description:
-          'GPS દ્વારા જમીનની Boundary, Area અને Distance માપવા માટેનું Survey section.',
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('GPS Survey'),
+        backgroundColor:
+            const Color(0xFF00897B),
+        foregroundColor:
+            Colors.white,
+      ),
+      body: Center(
+        child: Padding(
+          padding:
+              const EdgeInsets.all(25),
+          child: Column(
+            mainAxisAlignment:
+                MainAxisAlignment.center,
+            children: [
+
+              const Icon(
+                Icons.gps_fixed,
+                size: 80,
+                color:
+                    Color(0xFF00897B),
+              ),
+
+              const SizedBox(height: 15),
+
+              const Text(
+                'GPS Survey',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              const Text(
+                'GPS boundary અને live location module આગળ connect કરી શકાય છે.',
+                textAlign:
+                    TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
-
-// =====================================================
-// UNIT
-// =====================================================
-
-class UnitPage extends StatelessWidget {
-  const UnitPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const ToolPage(
-      title: 'Unit Conversion',
-      icon: Icons.swap_horiz,
-      description:
-          'ચોરસ ફૂટ, ચોરસ મીટર, ગુંઠા, એકર અને હેક્ટર જેવા જમીનના એકમોનું રૂપાંતર.',
-    );
-  }
-}
-
-
-// =====================================================
-// AREA
-// =====================================================
-
-class AreaPage extends StatelessWidget {
-  const AreaPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const ToolPage(
-      title: 'Area Calculator',
-      icon: Icons.calculate,
-      description:
-          'લંબચોરસ, ચોરસ, ત્રિકોણ અને અન્ય આકારોનું ક્ષેત્રફળ ગણવા માટેનું Calculator.',
-    );
-  }
-}
-
-
-// =====================================================
-// HISTORY
-// =====================================================
-
-class HistoryPage extends StatelessWidget {
-  const HistoryPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const ToolPage(
-      title: 'Saved History',
-      icon: Icons.history,
-      description:
-          'અગાઉની જમીન માપણી, નોંધો અને પેમેન્ટની માહિતી અહીંથી જોઈ શકાય છે.',
-    );
-  }
-}
-
-
-// =====================================================
+// ============================================================
 // MAP
-// =====================================================
+// ============================================================
 
 class MapPage extends StatelessWidget {
-  const MapPage({super.key});
+  final VoidCallback onHome;
+
+  const MapPage({
+    super.key,
+    required this.onHome,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return const ToolPage(
-      title: 'Survey Map',
-      icon: Icons.map,
-      description:
-          'GPS Survey અને જમીનની Boundary જોવા માટેનું Map section.',
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Map'),
+        backgroundColor:
+            const Color(0xFF1565C0),
+        foregroundColor:
+            Colors.white,
+        leading: IconButton(
+          icon:
+              const Icon(Icons.arrow_back),
+          onPressed: onHome,
+        ),
+      ),
+      body: const Center(
+        child: Text(
+          'Survey Map Module',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight:
+                FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 }
 
-
-// =====================================================
+// ============================================================
 // PROFILE
-// =====================================================
+// ============================================================
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  final VoidCallback onHome;
+
+  const ProfilePage({
+    super.key,
+    required this.onHome,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return const ToolPage(
-      title: 'Profile',
-      icon: Icons.person,
-      description:
-          'RUDRA SURVEYOR Professional Surveyor Profile.',
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('Profile'),
+        backgroundColor:
+            const Color(0xFF1565C0),
+        foregroundColor:
+            Colors.white,
+        leading: IconButton(
+          icon:
+              const Icon(Icons.arrow_back),
+          onPressed: onHome,
+        ),
+      ),
+      body: ListView(
+        padding:
+            const EdgeInsets.all(20),
+        children: [
+
+          Center(
+            child: Image.asset(
+              'assets/rudra_logo.jpg',
+              width: 120,
+              height: 120,
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          const Center(
+            child: Text(
+              'RUDRA SURVEYOR',
+              style: TextStyle(
+                fontSize: 25,
+                fontWeight:
+                    FontWeight.bold,
+                color:
+                    Color(0xFF123B68),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 25),
+
+          const ListTile(
+            leading:
+                Icon(Icons.support_agent),
+            title:
+                Text('Customer Care'),
+            subtitle:
+                Text('8487847474'),
+          ),
+
+          const ListTile(
+            leading:
+                Icon(Icons.person),
+            title:
+                Text('Customer Care Name'),
+            subtitle:
+                Text('Y.M. DHUNDHALAVA'),
+          ),
+        ],
+      ),
     );
   }
 }
 
-
-// =====================================================
+// ============================================================
 // SETTINGS
-// =====================================================
+// ============================================================
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const ToolPage(
-      title: 'Settings',
-      icon: Icons.settings,
-      description:
-          'RUDRA SURVEYOR application settings અહીંથી મેનેજ કરો.',
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('Settings'),
+        backgroundColor:
+            const Color(0xFF1565C0),
+        foregroundColor:
+            Colors.white,
+      ),
+      body: const ListView(
+        children: [
+
+          ListTile(
+            leading:
+                Icon(Icons.language),
+            title:
+                Text('Language'),
+            subtitle:
+                Text('ગુજરાતી / English'),
+          ),
+
+          ListTile(
+            leading:
+                Icon(Icons.info_outline),
+            title:
+                Text('About RUDRA SURVEYOR'),
+            subtitle:
+                Text(
+                  'Professional Land Surveyor App',
+                ),
+          ),
+        ],
+      ),
     );
   }
 }
 
+// ============================================================
+// FIELD
+// ============================================================
 
-// =====================================================
-// COMMON TOOL PAGE
-// =====================================================
-
-class ToolPage extends StatelessWidget {
-  final String title;
+class AppField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
   final IconData icon;
-  final String description;
+  final TextInputType? keyboard;
+  final ValueChanged<String>? onChanged;
 
-  const ToolPage({
+  const AppField({
     super.key,
-    required this.title,
+    required this.controller,
+    required this.label,
     required this.icon,
-    required this.description,
+    this.keyboard,
+    this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xfff5f8fc),
-
-      appBar: AppBar(
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
+    return Padding(
+      padding:
+          const EdgeInsets.only(
+        bottom: 14,
+      ),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboard,
+        onChanged: onChanged,
+        validator: (value) {
+          if (value == null ||
+              value.trim().isEmpty) {
+            return '$label લખો';
+          }
+          return null;
+        },
+        decoration:
+            InputDecoration(
+          labelText: label,
+          prefixIcon:
+              Icon(icon),
+          border:
+              OutlineInputBorder(
+            borderRadius:
+                BorderRadius.circular(
+              14,
+            ),
           ),
+          filled: true,
+          fillColor:
+              Colors.white,
         ),
       ),
+    );
+  }
+}
 
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(25),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+// ============================================================
+// INFO BOX
+// ============================================================
 
-              Icon(
-                icon,
-                size: 95,
-                color: const Color(0xff1476c9),
-              ),
+class InfoBox extends StatelessWidget {
+  final String text;
 
-              const SizedBox(height: 25),
+  const InfoBox({
+    super.key,
+    required this.text,
+  });
 
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 27,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xff123b70),
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              Text(
-                description,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  height: 1.5,
-                  color: Colors.grey,
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('પાછા Dashboard પર'),
-              ),
-            ],
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding:
+          const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color:
+            const Color(0xFFE3F2FD),
+        borderRadius:
+            BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline,
+            color:
+                Color(0xFF1565C0),
           ),
-        ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text),
+          ),
+        ],
       ),
     );
   }
