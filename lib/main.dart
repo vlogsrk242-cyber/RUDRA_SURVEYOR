@@ -2518,7 +2518,7 @@ class SettingsPage extends StatelessWidget {
             Colors.white,
       ),
 
-      body: Listview(
+      body: ListView(
         children: [
           ListTile(
             leading:
