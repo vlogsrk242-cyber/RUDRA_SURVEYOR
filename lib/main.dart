@@ -48,9 +48,21 @@ class HistoryStore {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(key) ?? [];
 
-    return list.map((e) {
-      return Map<String, dynamic>.from(jsonDecode(e));
-    }).toList();
+    final records = <Map<String, dynamic>>[];
+
+    for (final item in list) {
+      try {
+        final decoded = jsonDecode(item);
+
+        if (decoded is Map) {
+          records.add(
+            Map<String, dynamic>.from(decoded),
+          );
+        }
+      } catch (_) {}
+    }
+
+    return records;
   }
 
   static Future<void> addRecord(
@@ -60,6 +72,7 @@ class HistoryStore {
     final list = prefs.getStringList(key) ?? [];
 
     list.add(jsonEncode(record));
+
     await prefs.setStringList(key, list);
   }
 
@@ -71,6 +84,11 @@ class HistoryStore {
       list.removeAt(index);
       await prefs.setStringList(key, list);
     }
+  }
+
+  static Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(key);
   }
 }
 
@@ -92,7 +110,6 @@ class PdfService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-
               pw.Center(
                 child: pw.Text(
                   'RUDRA SURVEYOR',
@@ -102,9 +119,7 @@ class PdfService {
                   ),
                 ),
               ),
-
               pw.SizedBox(height: 5),
-
               pw.Center(
                 child: pw.Text(
                   'LAND SURVEY MEASUREMENT REPORT',
@@ -114,64 +129,51 @@ class PdfService {
                   ),
                 ),
               ),
-
               pw.SizedBox(height: 20),
-
               pw.Divider(),
-
               pw.SizedBox(height: 15),
 
               _pdfRow(
                 'Owner Name',
-                record['owner'] ?? '-',
+                record['owner']?.toString() ?? '-',
               ),
-
               _pdfRow(
                 'Mobile Number',
-                record['mobile'] ?? '-',
+                record['mobile']?.toString() ?? '-',
               ),
-
               _pdfRow(
                 'Village',
-                record['village'] ?? '-',
+                record['village']?.toString() ?? '-',
               ),
-
               _pdfRow(
                 'Taluka',
-                record['taluka'] ?? '-',
+                record['taluka']?.toString() ?? '-',
               ),
-
               _pdfRow(
                 'Survey Number',
-                record['survey'] ?? '-',
+                record['survey']?.toString() ?? '-',
               ),
-
               _pdfRow(
                 'Survey Date',
-                record['date'] ?? '-',
+                record['date']?.toString() ?? '-',
               ),
 
               pw.SizedBox(height: 10),
-
               pw.Divider(),
-
               pw.SizedBox(height: 10),
 
               _pdfRow(
                 'Length',
                 '${record['length'] ?? '0'} Meter',
               ),
-
               _pdfRow(
                 'Width',
                 '${record['width'] ?? '0'} Meter',
               ),
-
               _pdfRow(
                 'Total Area',
                 '${record['area'] ?? '0'} Square Meter',
               ),
-
               _pdfRow(
                 'Total Payment',
                 'Rs. ${record['payment'] ?? '0'}',
@@ -180,6 +182,7 @@ class PdfService {
               pw.SizedBox(height: 30),
 
               pw.Container(
+                width: double.infinity,
                 padding: const pw.EdgeInsets.all(12),
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(
@@ -258,137 +261,129 @@ class PdfService {
   static Future<void> previewPdf(
     Map<String, dynamic> record,
   ) async {
-    final pdf = pw.Document();
+    try {
+      final pdf = pw.Document();
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(30),
-        build: (context) {
-          return pw.Column(
-            crossAxisAlignment:
-                pw.CrossAxisAlignment.start,
-            children: [
-
-              pw.Center(
-                child: pw.Text(
-                  'RUDRA SURVEYOR',
-                  style: pw.TextStyle(
-                    fontSize: 26,
-                    fontWeight: pw.FontWeight.bold,
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(30),
+          build: (context) {
+            return pw.Column(
+              crossAxisAlignment:
+                  pw.CrossAxisAlignment.start,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    'RUDRA SURVEYOR',
+                    style: pw.TextStyle(
+                      fontSize: 26,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-
-              pw.SizedBox(height: 5),
-
-              pw.Center(
-                child: pw.Text(
-                  'LAND SURVEY MEASUREMENT REPORT',
-                  style: pw.TextStyle(
-                    fontSize: 13,
-                    fontWeight: pw.FontWeight.bold,
+                pw.SizedBox(height: 5),
+                pw.Center(
+                  child: pw.Text(
+                    'LAND SURVEY MEASUREMENT REPORT',
+                    style: pw.TextStyle(
+                      fontSize: 13,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
+                pw.SizedBox(height: 20),
+                pw.Divider(),
+                pw.SizedBox(height: 15),
 
-              pw.SizedBox(height: 20),
-
-              pw.Divider(),
-
-              pw.SizedBox(height: 15),
-
-              PdfService._pdfRow(
-                'Owner Name',
-                record['owner'] ?? '-',
-              ),
-
-              PdfService._pdfRow(
-                'Mobile Number',
-                record['mobile'] ?? '-',
-              ),
-
-              PdfService._pdfRow(
-                'Village',
-                record['village'] ?? '-',
-              ),
-
-              PdfService._pdfRow(
-                'Taluka',
-                record['taluka'] ?? '-',
-              ),
-
-              PdfService._pdfRow(
-                'Survey Number',
-                record['survey'] ?? '-',
-              ),
-
-              PdfService._pdfRow(
-                'Date',
-                record['date'] ?? '-',
-              ),
-
-              pw.SizedBox(height: 10),
-
-              pw.Divider(),
-
-              pw.SizedBox(height: 10),
-
-              PdfService._pdfRow(
-                'Length',
-                '${record['length'] ?? '0'} Meter',
-              ),
-
-              PdfService._pdfRow(
-                'Width',
-                '${record['width'] ?? '0'} Meter',
-              ),
-
-              PdfService._pdfRow(
-                'Total Area',
-                '${record['area'] ?? '0'} Square Meter',
-              ),
-
-              PdfService._pdfRow(
-                'Payment',
-                'Rs. ${record['payment'] ?? '0'}',
-              ),
-
-              pw.Spacer(),
-
-              pw.Center(
-                child: pw.Text(
-                  'Generated by RUDRA SURVEYOR',
+                _pdfRow(
+                  'Owner Name',
+                  record['owner']?.toString() ?? '-',
                 ),
-              ),
-            ],
-          );
+                _pdfRow(
+                  'Mobile Number',
+                  record['mobile']?.toString() ?? '-',
+                ),
+                _pdfRow(
+                  'Village',
+                  record['village']?.toString() ?? '-',
+                ),
+                _pdfRow(
+                  'Taluka',
+                  record['taluka']?.toString() ?? '-',
+                ),
+                _pdfRow(
+                  'Survey Number',
+                  record['survey']?.toString() ?? '-',
+                ),
+                _pdfRow(
+                  'Date',
+                  record['date']?.toString() ?? '-',
+                ),
+
+                pw.SizedBox(height: 10),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
+
+                _pdfRow(
+                  'Length',
+                  '${record['length'] ?? '0'} Meter',
+                ),
+                _pdfRow(
+                  'Width',
+                  '${record['width'] ?? '0'} Meter',
+                ),
+                _pdfRow(
+                  'Total Area',
+                  '${record['area'] ?? '0'} Square Meter',
+                ),
+                _pdfRow(
+                  'Payment',
+                  'Rs. ${record['payment'] ?? '0'}',
+                ),
+
+                pw.Spacer(),
+
+                pw.Center(
+                  child: pw.Text(
+                    'Generated by RUDRA SURVEYOR',
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (format) async {
+          return pdf.save();
         },
-      ),
-    );
-
-    await Printing.layoutPdf(
-      onLayout: (format) async {
-        return pdf.save();
-      },
-    );
+      );
+    } catch (e) {
+      debugPrint('PDF Preview Error: $e');
+    }
   }
 
   static Future<void> sharePdf(
     Map<String, dynamic> record,
   ) async {
-    final file = await createPdf(record);
+    try {
+      final file = await createPdf(record);
 
-    await Share.shareXFiles(
-      [
-        XFile(
-          file.path,
-          mimeType: 'application/pdf',
-        ),
-      ],
-      subject: 'RUDRA SURVEYOR Land Survey Report',
-      text: 'Land Survey Report - RUDRA SURVEYOR',
-    );
+      await Share.shareXFiles(
+        [
+          XFile(
+            file.path,
+            mimeType: 'application/pdf',
+          ),
+        ],
+        subject: 'RUDRA SURVEYOR Land Survey Report',
+        text: 'Land Survey Report - RUDRA SURVEYOR',
+      );
+    } catch (e) {
+      debugPrint('PDF Share Error: $e');
+    }
   }
 }
 
@@ -400,13 +395,11 @@ class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
   @override
-  State<Dashboard> createState() =>
-      _DashboardState();
+  State<Dashboard> createState() => _DashboardState();
 }
 
 class _DashboardState extends State<Dashboard> {
   int currentIndex = 0;
-
   int totalRecords = 0;
   double totalPayment = 0;
 
@@ -417,15 +410,14 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Future<void> loadStats() async {
-    final records =
-        await HistoryStore.getRecords();
+    final records = await HistoryStore.getRecords();
 
     double payment = 0;
 
-    for (final r in records) {
+    for (final record in records) {
       payment +=
           double.tryParse(
-                r['payment']?.toString() ?? '0',
+                record['payment']?.toString() ?? '0',
               ) ??
               0;
     }
@@ -446,7 +438,7 @@ class _DashboardState extends State<Dashboard> {
       ),
     );
 
-    loadStats();
+    await loadStats();
   }
 
   @override
@@ -457,6 +449,7 @@ class _DashboardState extends State<Dashboard> {
           setState(() {
             currentIndex = 0;
           });
+          loadStats();
         },
       );
     }
@@ -484,6 +477,7 @@ class _DashboardState extends State<Dashboard> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
+        elevation: 0,
         title: const Text(
           'RUDRA SURVEYOR',
           style: TextStyle(
@@ -495,6 +489,7 @@ class _DashboardState extends State<Dashboard> {
           IconButton(
             icon: const Icon(
               Icons.settings_outlined,
+              color: Color(0xFF123B68),
             ),
             onPressed: () {
               openPage(
@@ -508,10 +503,10 @@ class _DashboardState extends State<Dashboard> {
       body: RefreshIndicator(
         onRefresh: loadStats,
         child: ListView(
+          physics:
+              const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           children: [
-
-            // HEADER
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -523,14 +518,15 @@ class _DashboardState extends State<Dashboard> {
                     Color(0xFF1565C0),
                     Color(0xFF42A5F5),
                   ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
               ),
               child: Row(
                 children: [
-
                   Container(
-                    width: 70,
-                    height: 70,
+                    width: 72,
+                    height: 72,
                     padding:
                         const EdgeInsets.all(6),
                     decoration: BoxDecoration(
@@ -538,9 +534,13 @@ class _DashboardState extends State<Dashboard> {
                       borderRadius:
                           BorderRadius.circular(18),
                     ),
-                    child: Image.asset(
-                      'assets/rudra_logo.jpg',
-                      fit: BoxFit.contain,
+                    child: ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(13),
+                      child: Image.asset(
+                        'assets/rudra_logo.jpg',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
 
@@ -555,12 +555,12 @@ class _DashboardState extends State<Dashboard> {
                           'નમસ્તે! 👋',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 20,
+                            fontSize: 21,
                             fontWeight:
                                 FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 5),
+                        SizedBox(height: 6),
                         Text(
                           'RUDRA SURVEYOR માં આપનું સ્વાગત છે.',
                           style: TextStyle(
@@ -575,14 +575,42 @@ class _DashboardState extends State<Dashboard> {
               ),
             ),
 
-            const SizedBox(height: 22),
+            const SizedBox(height: 20),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _StatCard(
+                    icon:
+                        Icons.description_outlined,
+                    title: 'Records',
+                    value:
+                        '$totalRecords',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _StatCard(
+                    icon:
+                        Icons.currency_rupee,
+                    title: 'Payment',
+                    value:
+                        '₹${totalPayment.toStringAsFixed(0)}',
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
 
             const Text(
               'Survey Operations',
               style: TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF173A5E),
+                fontWeight:
+                    FontWeight.bold,
+                color:
+                    Color(0xFF173A5E),
               ),
             ),
 
@@ -668,8 +696,10 @@ class _DashboardState extends State<Dashboard> {
               'Saved History',
               style: TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF173A5E),
+                fontWeight:
+                    FontWeight.bold,
+                color:
+                    Color(0xFF173A5E),
               ),
             ),
 
@@ -693,7 +723,6 @@ class _DashboardState extends State<Dashboard> {
                 ),
                 child: Row(
                   children: [
-
                     Container(
                       width: 55,
                       height: 55,
@@ -749,6 +778,8 @@ class _DashboardState extends State<Dashboard> {
                 ),
               ),
             ),
+
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -802,6 +833,85 @@ class _DashboardState extends State<Dashboard> {
 }
 
 // ============================================================
+// STAT CARD
+// ============================================================
+
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+
+  const _StatCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding:
+          const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+            BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color:
+                  const Color(0xFFE3F2FD),
+              borderRadius:
+                  BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color:
+                  const Color(0xFF1565C0),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style:
+                      const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  overflow:
+                      TextOverflow.ellipsis,
+                  style:
+                      const TextStyle(
+                    fontSize: 16,
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
 // OPERATION CARD
 // ============================================================
 
@@ -834,13 +944,18 @@ class OperationCard extends StatelessWidget {
             const EdgeInsets.all(18),
         decoration: BoxDecoration(
           gradient:
-              LinearGradient(colors: colors),
+              LinearGradient(
+            colors: colors,
+            begin:
+                Alignment.topLeft,
+            end:
+                Alignment.bottomRight,
+          ),
           borderRadius:
               BorderRadius.circular(22),
         ),
         child: Row(
           children: [
-
             Container(
               width: 58,
               height: 58,
@@ -897,8 +1012,11 @@ class OperationCard extends StatelessWidget {
               ),
             ),
 
+            const SizedBox(width: 8),
+
             const CircleAvatar(
-              backgroundColor: Colors.white,
+              backgroundColor:
+                  Colors.white,
               child: Icon(
                 Icons.arrow_forward,
                 color:
@@ -913,7 +1031,7 @@ class OperationCard extends StatelessWidget {
 }
 
 // ============================================================
-// OP1
+// OP1 - LAND ENTRY
 // ============================================================
 
 class LandEntryPage extends StatefulWidget {
@@ -926,7 +1044,6 @@ class LandEntryPage extends StatefulWidget {
 
 class _LandEntryPageState
     extends State<LandEntryPage> {
-
   final formKey =
       GlobalKey<FormState>();
 
@@ -958,6 +1075,8 @@ class _LandEntryPageState
 
   double area = 0;
 
+  bool saving = false;
+
   @override
   void dispose() {
     owner.dispose();
@@ -977,6 +1096,8 @@ class _LandEntryPageState
 
     final w =
         double.tryParse(width.text) ?? 0;
+
+    if (!mounted) return;
 
     setState(() {
       area = l * w;
@@ -1002,12 +1123,47 @@ class _LandEntryPageState
   }
 
   Future<void> save() async {
+    if (saving) return;
+
     if (!formKey.currentState!
         .validate()) {
       return;
     }
 
-    calculateArea();
+    final l =
+        double.tryParse(length.text.trim());
+
+    final w =
+        double.tryParse(width.text.trim());
+
+    final pay =
+        double.tryParse(payment.text.trim());
+
+    if (l == null || l <= 0) {
+      _showMessage(
+        'લંબાઈ યોગ્ય રીતે લખો.',
+      );
+      return;
+    }
+
+    if (w == null || w <= 0) {
+      _showMessage(
+        'પહોળાઈ યોગ્ય રીતે લખો.',
+      );
+      return;
+    }
+
+    if (pay == null || pay < 0) {
+      _showMessage(
+        'પેમેન્ટ યોગ્ય રીતે લખો.',
+      );
+      return;
+    }
+
+    setState(() {
+      saving = true;
+      area = l * w;
+    });
 
     final record = {
       'owner': owner.text.trim(),
@@ -1015,45 +1171,74 @@ class _LandEntryPageState
       'village': village.text.trim(),
       'taluka': taluka.text.trim(),
       'survey': survey.text.trim(),
-      'length': length.text.trim(),
-      'width': width.text.trim(),
-      'area': area.toStringAsFixed(2),
-      'payment': payment.text.trim(),
+      'length': l.toString(),
+      'width': w.toString(),
+      'area': (l * w).toStringAsFixed(2),
+      'payment': pay.toString(),
       'date':
           '${date.day}/${date.month}/${date.year}',
+      'createdAt':
+          DateTime.now().toIso8601String(),
     };
 
-    await HistoryStore.addRecord(
-      record,
-    );
+    try {
+      await HistoryStore.addRecord(
+        record,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    await showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text(
-            'Save Successful ✅',
-          ),
-          content: const Text(
-            'જમીન માપણીની નોંધ Save થઈ ગઈ છે.\n\nહવે PDF બનાવીને WhatsApp દ્વારા મોકલી શકો છો.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.pop(context),
-              child: const Text('OK'),
+      setState(() {
+        saving = false;
+      });
+
+      await showDialog(
+        context: context,
+        builder: (_) {
+          return AlertDialog(
+            title: const Text(
+              'Save Successful ✅',
             ),
-          ],
-        );
-      },
-    );
+            content: const Text(
+              'જમીન માપણીની નોંધ Saved History માં સાચવાઈ ગઈ છે.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child:
+                    const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    await showReportOptions(
-      record,
+      await showReportOptions(
+        record,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        saving = false;
+      });
+
+      _showMessage(
+        'Record save કરવામાં error આવ્યો.',
+      );
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
     );
   }
 
@@ -1071,7 +1256,6 @@ class _LandEntryPageState
               mainAxisSize:
                   MainAxisSize.min,
               children: [
-
                 const Text(
                   'Land Survey Report',
                   style: TextStyle(
@@ -1084,21 +1268,25 @@ class _LandEntryPageState
                 const SizedBox(height: 20),
 
                 ListTile(
-                  leading: const Icon(
+                  leading:
+                      const Icon(
                     Icons.picture_as_pdf,
                     color: Colors.red,
                   ),
-                  title:
-                      const Text('PDF બનાવો / Preview'),
+                  title: const Text(
+                    'PDF બનાવો / Preview',
+                  ),
                   onTap: () async {
                     Navigator.pop(context);
+
                     await PdfService
                         .previewPdf(record);
                   },
                 ),
 
                 ListTile(
-                  leading: const Icon(
+                  leading:
+                      const Icon(
                     Icons.share,
                     color: Colors.green,
                   ),
@@ -1107,6 +1295,7 @@ class _LandEntryPageState
                   ),
                   onTap: () async {
                     Navigator.pop(context);
+
                     await PdfService
                         .sharePdf(record);
                   },
@@ -1124,18 +1313,21 @@ class _LandEntryPageState
     return Scaffold(
       appBar: AppBar(
         title:
-            const Text('જમીન માપણી નોંધ'),
+            const Text(
+          'જમીન માપણી નોંધ',
+        ),
         backgroundColor:
             const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
+        foregroundColor:
+            Colors.white,
       ),
+
       body: Form(
         key: formKey,
         child: ListView(
           padding:
               const EdgeInsets.all(16),
           children: [
-
             const InfoBox(
               text:
                   'માહિતી Save કર્યા પછી Saved History માં રહેશે અને PDF Report બનાવી શકાશે.',
@@ -1145,14 +1337,18 @@ class _LandEntryPageState
 
             AppField(
               controller: owner,
-              label: 'માલિકનું નામ',
-              icon: Icons.person,
+              label:
+                  'માલિકનું નામ',
+              icon:
+                  Icons.person,
             ),
 
             AppField(
               controller: mobile,
-              label: 'મોબાઇલ નંબર',
-              icon: Icons.phone,
+              label:
+                  'મોબાઇલ નંબર',
+              icon:
+                  Icons.phone,
               keyboard:
                   TextInputType.phone,
             ),
@@ -1160,19 +1356,23 @@ class _LandEntryPageState
             AppField(
               controller: village,
               label: 'ગામ',
-              icon: Icons.location_city,
+              icon:
+                  Icons.location_city,
             ),
 
             AppField(
               controller: taluka,
               label: 'તાલુકો',
-              icon: Icons.location_on,
+              icon:
+                  Icons.location_on,
             ),
 
             AppField(
               controller: survey,
-              label: 'સર્વે નંબર',
-              icon: Icons.numbers,
+              label:
+                  'સર્વે નંબર',
+              icon:
+                  Icons.numbers,
             ),
 
             const SizedBox(height: 5),
@@ -1184,7 +1384,8 @@ class _LandEntryPageState
                     const InputDecoration(
                   labelText:
                       'માપણીની તારીખ',
-                  prefixIcon: Icon(
+                  prefixIcon:
+                      Icon(
                     Icons.calendar_month,
                   ),
                   border:
@@ -1200,11 +1401,12 @@ class _LandEntryPageState
 
             Row(
               children: [
-
                 Expanded(
                   child: AppField(
-                    controller: length,
-                    label: 'લંબાઈ (મીટર)',
+                    controller:
+                        length,
+                    label:
+                        'લંબાઈ (મીટર)',
                     icon:
                         Icons.straighten,
                     keyboard:
@@ -1212,17 +1414,22 @@ class _LandEntryPageState
                             .numberWithOptions(
                       decimal: true,
                     ),
-                    onChanged: (_) =>
-                        calculateArea(),
+                    onChanged:
+                        (_) {
+                      calculateArea();
+                    },
                   ),
                 ),
 
-                const SizedBox(width: 10),
+                const SizedBox(
+                    width: 10),
 
                 Expanded(
                   child: AppField(
-                    controller: width,
-                    label: 'પહોળાઈ (મીટર)',
+                    controller:
+                        width,
+                    label:
+                        'પહોળાઈ (મીટર)',
                     icon:
                         Icons.straighten,
                     keyboard:
@@ -1230,8 +1437,10 @@ class _LandEntryPageState
                             .numberWithOptions(
                       decimal: true,
                     ),
-                    onChanged: (_) =>
-                        calculateArea(),
+                    onChanged:
+                        (_) {
+                      calculateArea();
+                    },
                   ),
                 ),
               ],
@@ -1239,12 +1448,19 @@ class _LandEntryPageState
 
             Container(
               padding:
-                  const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+                  const EdgeInsets.all(
+                16,
+              ),
+              decoration:
+                  BoxDecoration(
                 color:
-                    const Color(0xFFE3F2FD),
+                    const Color(
+                  0xFFE3F2FD,
+                ),
                 borderRadius:
-                    BorderRadius.circular(16),
+                    BorderRadius.circular(
+                  16,
+                ),
               ),
               child: Text(
                 'Total Area: ${area.toStringAsFixed(2)} m²',
@@ -1262,8 +1478,10 @@ class _LandEntryPageState
             const SizedBox(height: 15),
 
             AppField(
-              controller: payment,
-              label: 'કુલ પેમેન્ટ (₹)',
+              controller:
+                  payment,
+              label:
+                  'કુલ પેમેન્ટ (₹)',
               icon:
                   Icons.currency_rupee,
               keyboard:
@@ -1277,14 +1495,32 @@ class _LandEntryPageState
 
             SizedBox(
               height: 55,
-              child: ElevatedButton.icon(
-                onPressed: save,
-                icon: const Icon(
-                  Icons.save,
-                ),
-                label: const Text(
-                  'Save + PDF Report',
-                  style: TextStyle(
+              child:
+                  ElevatedButton.icon(
+                onPressed:
+                    saving
+                        ? null
+                        : save,
+                icon: saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color:
+                              Colors.white,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.save,
+                      ),
+                label: Text(
+                  saving
+                      ? 'Saving...'
+                      : 'Save + PDF Report',
+                  style:
+                      const TextStyle(
                     fontSize: 17,
                     fontWeight:
                         FontWeight.bold,
@@ -1301,6 +1537,8 @@ class _LandEntryPageState
                 ),
               ),
             ),
+
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -1327,8 +1565,8 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState
     extends State<HistoryPage> {
-
-  List<Map<String, dynamic>> records = [];
+  List<Map<String, dynamic>>
+      records = [];
 
   @override
   void initState() {
@@ -1343,23 +1581,66 @@ class _HistoryPageState
     if (!mounted) return;
 
     setState(() {
-      records = data.reversed.toList();
+      records =
+          data.reversed.toList();
     });
   }
 
   Future<void> delete(
     int displayIndex,
   ) async {
+    final confirm =
+        await showDialog<bool>(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text(
+            'Record Delete?',
+          ),
+          content: const Text(
+            'શું તમે આ saved record delete કરવા માંગો છો?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  false,
+                );
+              },
+              child:
+                  const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  true,
+                );
+              },
+              child:
+                  const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
     final originalIndex =
         records.length -
             1 -
             displayIndex;
 
-    await HistoryStore.deleteRecord(
+    await HistoryStore
+        .deleteRecord(
       originalIndex,
     );
 
-    load();
+    await load();
   }
 
   @override
@@ -1367,30 +1648,49 @@ class _HistoryPageState
     return Scaffold(
       appBar: AppBar(
         title:
-            const Text('Saved History'),
+            const Text(
+          'Saved History',
+        ),
         backgroundColor:
             const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
+        foregroundColor:
+            Colors.white,
         leading: IconButton(
           icon:
-              const Icon(Icons.arrow_back),
-          onPressed: widget.onHome,
+              const Icon(
+            Icons.arrow_back,
+          ),
+          onPressed:
+              widget.onHome,
         ),
       ),
+
       body: records.isEmpty
           ? const Center(
-              child: Text(
-                'હજુ કોઈ જમીન માપણી નોંધ નથી.',
-                style: TextStyle(
-                  fontSize: 18,
+              child: Padding(
+                padding:
+                    EdgeInsets.all(30),
+                child: Text(
+                  'હજુ કોઈ જમીન માપણી નોંધ નથી.\n\nOP1 માં જઈને પ્રથમ record Save કરો.',
+                  textAlign:
+                      TextAlign.center,
+                  style:
+                      TextStyle(
+                    fontSize: 18,
+                  ),
                 ),
               ),
             )
           : RefreshIndicator(
               onRefresh: load,
-              child: ListView.builder(
+              child:
+                  ListView.builder(
+                physics:
+                    const AlwaysScrollableScrollPhysics(),
                 padding:
-                    const EdgeInsets.all(15),
+                    const EdgeInsets.all(
+                  15,
+                ),
                 itemCount:
                     records.length,
                 itemBuilder:
@@ -1403,23 +1703,24 @@ class _HistoryPageState
                         const EdgeInsets.only(
                       bottom: 12,
                     ),
-                    child: Padding(
+                    child:
+                        Padding(
                       padding:
                           const EdgeInsets.all(
                         15,
                       ),
-                      child: Column(
+                      child:
+                          Column(
                         children: [
-
                           Row(
                             children: [
-
                               const CircleAvatar(
                                 backgroundColor:
                                     Color(
                                   0xFFE3F2FD,
                                 ),
-                                child: Icon(
+                                child:
+                                    Icon(
                                   Icons.landscape,
                                   color:
                                       Color(
@@ -1433,10 +1734,10 @@ class _HistoryPageState
                               ),
 
                               Expanded(
-                                child: Column(
+                                child:
+                                    Column(
                                   crossAxisAlignment:
-                                      CrossAxisAlignment
-                                          .start,
+                                      CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       r['owner']
@@ -1447,8 +1748,7 @@ class _HistoryPageState
                                         fontSize:
                                             17,
                                         fontWeight:
-                                            FontWeight
-                                                .bold,
+                                            FontWeight.bold,
                                       ),
                                     ),
                                     Text(
@@ -1461,13 +1761,16 @@ class _HistoryPageState
                               IconButton(
                                 icon:
                                     const Icon(
-                                  Icons
-                                      .delete_outline,
+                                  Icons.delete_outline,
                                   color:
                                       Colors.red,
                                 ),
-                                onPressed: () =>
-                                    delete(index),
+                                onPressed:
+                                    () {
+                                  delete(
+                                    index,
+                                  );
+                                },
                               ),
                             ],
                           ),
@@ -1500,7 +1803,6 @@ class _HistoryPageState
 
                           Row(
                             children: [
-
                               Expanded(
                                 child:
                                     OutlinedButton.icon(
@@ -1513,8 +1815,7 @@ class _HistoryPageState
                                   },
                                   icon:
                                       const Icon(
-                                    Icons
-                                        .picture_as_pdf,
+                                    Icons.picture_as_pdf,
                                   ),
                                   label:
                                       const Text(
@@ -1546,14 +1847,11 @@ class _HistoryPageState
                                     'Share',
                                   ),
                                   style:
-                                      ElevatedButton
-                                          .styleFrom(
+                                      ElevatedButton.styleFrom(
                                     backgroundColor:
-                                        Colors
-                                            .green,
+                                        Colors.green,
                                     foregroundColor:
-                                        Colors
-                                            .white,
+                                        Colors.white,
                                   ),
                                 ),
                               ),
@@ -1589,7 +1887,8 @@ class _HistoryPageState
             ),
           ),
           Expanded(
-            child: Text(value),
+            child:
+                Text(value),
           ),
         ],
       ),
@@ -1598,7 +1897,7 @@ class _HistoryPageState
 }
 
 // ============================================================
-// AREA CALCULATOR
+// OP4 - AREA CALCULATOR
 // ============================================================
 
 class AreaPage extends StatefulWidget {
@@ -1611,7 +1910,6 @@ class AreaPage extends StatefulWidget {
 
 class _AreaPageState
     extends State<AreaPage> {
-
   final length =
       TextEditingController();
 
@@ -1622,10 +1920,16 @@ class _AreaPageState
 
   void calculate() {
     final l =
-        double.tryParse(length.text) ?? 0;
+        double.tryParse(
+              length.text,
+            ) ??
+            0;
 
     final w =
-        double.tryParse(width.text) ?? 0;
+        double.tryParse(
+              width.text,
+            ) ??
+            0;
 
     setState(() {
       area = l * w;
@@ -1644,20 +1948,26 @@ class _AreaPageState
     return Scaffold(
       appBar: AppBar(
         title:
-            const Text('Area Calculator'),
+            const Text(
+          'Area Calculator',
+        ),
         backgroundColor:
             const Color(0xFFEF6C00),
-        foregroundColor: Colors.white,
+        foregroundColor:
+            Colors.white,
       ),
+
       body: ListView(
         padding:
             const EdgeInsets.all(16),
         children: [
-
           AppField(
-            controller: length,
-            label: 'લંબાઈ (મીટર)',
-            icon: Icons.straighten,
+            controller:
+                length,
+            label:
+                'લંબાઈ (મીટર)',
+            icon:
+                Icons.straighten,
             keyboard:
                 const TextInputType
                     .numberWithOptions(
@@ -1666,9 +1976,12 @@ class _AreaPageState
           ),
 
           AppField(
-            controller: width,
-            label: 'પહોળાઈ (મીટર)',
-            icon: Icons.straighten,
+            controller:
+                width,
+            label:
+                'પહોળાઈ (મીટર)',
+            icon:
+                Icons.straighten,
             keyboard:
                 const TextInputType
                     .numberWithOptions(
@@ -1679,15 +1992,19 @@ class _AreaPageState
           const SizedBox(height: 10),
 
           ElevatedButton(
-            onPressed: calculate,
+            onPressed:
+                calculate,
             style:
                 ElevatedButton.styleFrom(
               backgroundColor:
-                  const Color(0xFFEF6C00),
+                  const Color(
+                0xFFEF6C00,
+              ),
               foregroundColor:
                   Colors.white,
             ),
-            child: const Text(
+            child:
+                const Text(
               'Calculate Area',
             ),
           ),
@@ -1697,7 +2014,8 @@ class _AreaPageState
           Center(
             child: Text(
               '${area.toStringAsFixed(2)} m²',
-              style: const TextStyle(
+              style:
+                  const TextStyle(
                 fontSize: 32,
                 fontWeight:
                     FontWeight.bold,
@@ -1713,7 +2031,7 @@ class _AreaPageState
 }
 
 // ============================================================
-// UNIT
+// OP3 - UNIT CONVERSION
 // ============================================================
 
 class UnitPage extends StatefulWidget {
@@ -1726,7 +2044,6 @@ class UnitPage extends StatefulWidget {
 
 class _UnitPageState
     extends State<UnitPage> {
-
   final input =
       TextEditingController();
 
@@ -1781,10 +2098,16 @@ class _UnitPageState
 
   void convert() {
     final value =
-        double.tryParse(input.text) ?? 0;
+        double.tryParse(
+              input.text,
+            ) ??
+            0;
 
     final meters =
-        meterValue(value, from);
+        meterValue(
+      value,
+      from,
+    );
 
     final converted =
         convertFromMeter(
@@ -1794,7 +2117,9 @@ class _UnitPageState
 
     setState(() {
       result =
-          converted.toStringAsFixed(4);
+          converted.toStringAsFixed(
+        4,
+      );
     });
   }
 
@@ -1809,20 +2134,26 @@ class _UnitPageState
     return Scaffold(
       appBar: AppBar(
         title:
-            const Text('Unit Conversion'),
+            const Text(
+          'Unit Conversion',
+        ),
         backgroundColor:
             const Color(0xFF7B1FA2),
-        foregroundColor: Colors.white,
+        foregroundColor:
+            Colors.white,
       ),
+
       body: ListView(
         padding:
             const EdgeInsets.all(16),
         children: [
-
           AppField(
-            controller: input,
-            label: 'Value',
-            icon: Icons.numbers,
+            controller:
+                input,
+            label:
+                'Value',
+            icon:
+                Icons.numbers,
             keyboard:
                 const TextInputType
                     .numberWithOptions(
@@ -1831,22 +2162,27 @@ class _UnitPageState
           ),
 
           DropdownButtonFormField<String>(
-            initialValue: from,
+            value: from,
             decoration:
                 const InputDecoration(
-              labelText: 'From',
+              labelText:
+                  'From',
               border:
                   OutlineInputBorder(),
             ),
             items: units
                 .map(
-                  (u) => DropdownMenuItem(
+                  (u) =>
+                      DropdownMenuItem<
+                          String>(
                     value: u,
-                    child: Text(u),
+                    child:
+                        Text(u),
                   ),
                 )
                 .toList(),
-            onChanged: (v) {
+            onChanged:
+                (v) {
               if (v != null) {
                 setState(() {
                   from = v;
@@ -1855,25 +2191,31 @@ class _UnitPageState
             },
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(
+              height: 12),
 
           DropdownButtonFormField<String>(
-            initialValue: to,
+            value: to,
             decoration:
                 const InputDecoration(
-              labelText: 'To',
+              labelText:
+                  'To',
               border:
                   OutlineInputBorder(),
             ),
             items: units
                 .map(
-                  (u) => DropdownMenuItem(
+                  (u) =>
+                      DropdownMenuItem<
+                          String>(
                     value: u,
-                    child: Text(u),
+                    child:
+                        Text(u),
                   ),
                 )
                 .toList(),
-            onChanged: (v) {
+            onChanged:
+                (v) {
               if (v != null) {
                 setState(() {
                   to = v;
@@ -1882,20 +2224,26 @@ class _UnitPageState
             },
           ),
 
-          const SizedBox(height: 15),
+          const SizedBox(
+              height: 15),
 
           ElevatedButton(
-            onPressed: convert,
+            onPressed:
+                convert,
             child:
-                const Text('Convert'),
+                const Text(
+              'Convert',
+            ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(
+              height: 20),
 
           Center(
             child: Text(
               '$result $to',
-              style: const TextStyle(
+              style:
+                  const TextStyle(
                 fontSize: 28,
                 fontWeight:
                     FontWeight.bold,
@@ -1911,7 +2259,7 @@ class _UnitPageState
 }
 
 // ============================================================
-// GPS
+// OP2 - GPS
 // ============================================================
 
 class GpsPage extends StatelessWidget {
@@ -1922,12 +2270,15 @@ class GpsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title:
-            const Text('GPS Survey'),
+            const Text(
+          'GPS Survey',
+        ),
         backgroundColor:
             const Color(0xFF00897B),
         foregroundColor:
             Colors.white,
       ),
+
       body: Center(
         child: Padding(
           padding:
@@ -1936,7 +2287,6 @@ class GpsPage extends StatelessWidget {
             mainAxisAlignment:
                 MainAxisAlignment.center,
             children: [
-
               const Icon(
                 Icons.gps_fixed,
                 size: 80,
@@ -1944,18 +2294,21 @@ class GpsPage extends StatelessWidget {
                     Color(0xFF00897B),
               ),
 
-              const SizedBox(height: 15),
+              const SizedBox(
+                  height: 15),
 
               const Text(
                 'GPS Survey',
-                style: TextStyle(
+                style:
+                    TextStyle(
                   fontSize: 24,
                   fontWeight:
                       FontWeight.bold,
                 ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(
+                  height: 10),
 
               const Text(
                 'GPS boundary અને live location module આગળ connect કરી શકાય છે.',
@@ -1986,24 +2339,55 @@ class MapPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Map'),
+        title:
+            const Text('Map'),
         backgroundColor:
             const Color(0xFF1565C0),
         foregroundColor:
             Colors.white,
         leading: IconButton(
           icon:
-              const Icon(Icons.arrow_back),
-          onPressed: onHome,
+              const Icon(
+            Icons.arrow_back,
+          ),
+          onPressed:
+              onHome,
         ),
       ),
+
       body: const Center(
-        child: Text(
-          'Survey Map Module',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight:
-                FontWeight.bold,
+        child: Padding(
+          padding:
+              EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment:
+                MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.map,
+                size: 80,
+                color:
+                    Color(0xFF1565C0),
+              ),
+              SizedBox(
+                  height: 15),
+              Text(
+                'Survey Map Module',
+                style:
+                    TextStyle(
+                  fontSize: 24,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+              SizedBox(
+                  height: 10),
+              Text(
+                'Map અને survey boundary module આગળ connect કરી શકાય છે.',
+                textAlign:
+                    TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),
@@ -2028,36 +2412,44 @@ class ProfilePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title:
-            const Text('Profile'),
+            const Text(
+          'Profile',
+        ),
         backgroundColor:
             const Color(0xFF1565C0),
         foregroundColor:
             Colors.white,
         leading: IconButton(
           icon:
-              const Icon(Icons.arrow_back),
-          onPressed: onHome,
+              const Icon(
+            Icons.arrow_back,
+          ),
+          onPressed:
+              onHome,
         ),
       ),
+
       body: ListView(
         padding:
             const EdgeInsets.all(20),
         children: [
-
           Center(
             child: Image.asset(
               'assets/rudra_logo.jpg',
               width: 120,
               height: 120,
+              fit: BoxFit.contain,
             ),
           ),
 
-          const SizedBox(height: 15),
+          const SizedBox(
+              height: 15),
 
           const Center(
             child: Text(
               'RUDRA SURVEYOR',
-              style: TextStyle(
+              style:
+                  TextStyle(
                 fontSize: 25,
                 fontWeight:
                     FontWeight.bold,
@@ -2067,24 +2459,37 @@ class ProfilePage extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 25),
+          const SizedBox(
+              height: 25),
 
           const ListTile(
             leading:
-                Icon(Icons.support_agent),
+                Icon(
+              Icons.support_agent,
+            ),
             title:
-                Text('Customer Care'),
+                Text(
+              'Customer Care',
+            ),
             subtitle:
-                Text('8487847474'),
+                Text(
+              '8487847474',
+            ),
           ),
 
           const ListTile(
             leading:
-                Icon(Icons.person),
+                Icon(
+              Icons.person,
+            ),
             title:
-                Text('Customer Care Name'),
+                Text(
+              'Customer Care Name',
+            ),
             subtitle:
-                Text('Y.M. DHUNDHALAVA'),
+                Text(
+              'Y.M. DHUNDHALAVA',
+            ),
           ),
         ],
       ),
@@ -2104,33 +2509,45 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title:
-            const Text('Settings'),
+            const Text(
+          'Settings',
+        ),
         backgroundColor:
             const Color(0xFF1565C0),
         foregroundColor:
             Colors.white,
       ),
+
       body: const ListView(
         children: [
-
           ListTile(
             leading:
-                Icon(Icons.language),
+                Icon(
+              Icons.language,
+            ),
             title:
-                Text('Language'),
+                Text(
+              'Language',
+            ),
             subtitle:
-                Text('ગુજરાતી / English'),
+                Text(
+              'ગુજરાતી / English',
+            ),
           ),
 
           ListTile(
             leading:
-                Icon(Icons.info_outline),
+                Icon(
+              Icons.info_outline,
+            ),
             title:
-                Text('About RUDRA SURVEYOR'),
+                Text(
+              'About RUDRA SURVEYOR',
+            ),
             subtitle:
                 Text(
-                  'Professional Land Surveyor App',
-                ),
+              'Professional Land Surveyor App',
+            ),
           ),
         ],
       ),
@@ -2139,7 +2556,7 @@ class SettingsPage extends StatelessWidget {
 }
 
 // ============================================================
-// FIELD
+// APP FIELD
 // ============================================================
 
 class AppField extends StatelessWidget {
@@ -2165,20 +2582,30 @@ class AppField extends StatelessWidget {
           const EdgeInsets.only(
         bottom: 14,
       ),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboard,
-        onChanged: onChanged,
-        validator: (value) {
-          if (value == null ||
-              value.trim().isEmpty) {
+      child:
+          TextFormField(
+        controller:
+            controller,
+        keyboardType:
+            keyboard,
+        onChanged:
+            onChanged,
+        validator:
+            (value) {
+          if (value ==
+                  null ||
+              value
+                  .trim()
+                  .isEmpty) {
             return '$label લખો';
           }
+
           return null;
         },
         decoration:
             InputDecoration(
-          labelText: label,
+          labelText:
+              label,
           prefixIcon:
               Icon(icon),
           border:
@@ -2188,7 +2615,8 @@ class AppField extends StatelessWidget {
               14,
             ),
           ),
-          filled: true,
+          filled:
+              true,
           fillColor:
               Colors.white,
         ),
@@ -2214,7 +2642,8 @@ class InfoBox extends StatelessWidget {
     return Container(
       padding:
           const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration:
+          BoxDecoration(
         color:
             const Color(0xFFE3F2FD),
         borderRadius:
@@ -2227,9 +2656,11 @@ class InfoBox extends StatelessWidget {
             color:
                 Color(0xFF1565C0),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(
+              width: 10),
           Expanded(
-            child: Text(text),
+            child:
+                Text(text),
           ),
         ],
       ),
